@@ -34,11 +34,11 @@ if len(args) == 3:
     except:
         print("You did not enter a number for maximum, default is 100")
 
-print "maximum = ", maximum
+print("maximum = ", maximum)
 
 for i in range(2, number):
     if count > maximum:
         break
     if isPrime(i):
-        print i*math.sin(i), i*math.cos(i)
+        print(i*math.sin(i), i*math.cos(i))
         count += 1
