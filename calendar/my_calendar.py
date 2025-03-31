@@ -18,12 +18,13 @@ import logging.config
 config = {
     'version': 1,
     'formatters': {
-        'simple': {'format': '%(asctime)s - %(name)s - %(levelname)s - %(message)s'}
+        'simple': {'format': '%(asctime)s - %(levelname)s - %(message)s'}
     },
     'handlers': {
         'console': {
-            'class': 'logging.StreamHandler',
+            'class': 'logging.FileHandler',
             'formatter': 'simple',
+            'filename': 'calendar.log',
             'level': logging.DEBUG
         }
     },
@@ -35,7 +36,7 @@ logging.config.dictConfig(config)
 verbose_config = {
     'version': 1,
     'formatters': {
-        'simple': {'format': '%(asctime)s - %(name)s - %(levelname)s - %(message)s'},
+        'simple': {'format': '%(asctime)s - %(levelname)s - %(message)s'},
         'default': {'format': '%(levelname)s: %(message)s'}  # Added missing formatter
     },
     'handlers': {
