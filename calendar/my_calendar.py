@@ -162,7 +162,7 @@ def download_ics(isc_download):
         logging.error('ics not downloaded')
         return False
 
-def convert_ics_to_html(ics_file, days_out, html_file):
+def convert_ics_to_html(ics_file, days_out, html_file, extra):
     '''
     Convert ICS file content to an HTML file with events sorted by date.
     
@@ -208,6 +208,8 @@ def convert_ics_to_html(ics_file, days_out, html_file):
 
     html = "<html><head><title>Lodge Calendar</title></head><body>\n"
     html += f"<h1>Good Samaritan Calendar Events - {days_out} Days Out</h1><br>\n"
+    if extra != None:
+        html += f'{extra}\n'
     html += f'<h2 style="color:red">Rental Events in Red</h2>\n'
     html += f'<h2 style="color:blue">Order of Eastern Star Events in Blue</h2>\n'
 
@@ -256,6 +258,7 @@ def initialize():
     parser.add_argument('-d', '--distro', help='Distro file')
     parser.add_argument('-s', '--subject', help='Subject of email', default='Lodge Calendar')
     parser.add_argument('-v', '--verbose', help='Send all logg messages to console', default=False, action='store_true')
+    parser.add_argument('-e', '--extra', help='Extra text for mailing html')
     mail_group = parser.add_mutually_exclusive_group(required=True)
     mail_group.add_argument('--mail', dest='mail', help='Send email to distro list', action='store_true')
     mail_group.add_argument('--no-mail', dest='mail', help='No email will be sent', action='store_false')
@@ -288,10 +291,11 @@ def main():
     isc_download = "download.ics"
     ics_data = download_ics(isc_download)
     window = int(getattr(args, "window"))
+    extra = getattr(args, 'extra')
     html_file = "my_calendar.html"
     
     if ics_data:
-        if convert_ics_to_html(isc_download, window, html_file) == False:
+        if convert_ics_to_html(isc_download, window, html_file, extra) == False:
             return
     
     do_mail = getattr(args, 'mail')
