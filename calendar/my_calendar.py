@@ -11,6 +11,20 @@ import argparse
 from dotenv import load_dotenv
 import logging
 import logging.config
+import html
+
+def sanitize_text(text):
+    """Sanitize user input or ICS text for safe HTML rendering."""
+    if not text:
+        return ""
+    
+    # Escape special HTML characters
+    safe_text = html.escape(text)
+    
+    # Replace newlines with <br> for HTML emails
+    safe_text = safe_text.replace("\n", "<br>")
+    
+    return safe_text
 
 # We have two versions of the logging configuration.  The default only
 # writes to the log, while the verbose version will echo to the console.
@@ -162,7 +176,7 @@ def download_ics(isc_download):
         logging.error('ics not downloaded')
         return False
 
-def convert_ics_to_html(ics_file, days_out, html_file, extra):
+def convert_ics_to_html(ics_file, days_out, html_file, extra, extra_file):
     '''
     Convert ICS file content to an HTML file with events sorted by date.
     
@@ -170,7 +184,8 @@ def convert_ics_to_html(ics_file, days_out, html_file, extra):
     ics_file: Path to ics calendar file
     days_out: Integer number of days that HTML file will show
     html_file: Output path to html file created
-
+    extra: some extra html that will be added to the email, typicaly a single line
+    extra_file: path to a text file that contains additional html text to be added to the email.
     '''
     
     try:
@@ -185,7 +200,8 @@ def convert_ics_to_html(ics_file, days_out, html_file, extra):
     now = my_tz.localize(datetime.datetime.now())
     
     for event in cal.walk("vevent"):
-        summary = event.get("summary", "No Title")
+        summary = sanitize_text(event.get("summary", "No Title"))
+
         dtstart = event.get("dtstart").dt
         dtend = event.get("dtend").dt
 
@@ -208,8 +224,22 @@ def convert_ics_to_html(ics_file, days_out, html_file, extra):
 
     html = "<html><head><title>Lodge Calendar</title></head><body>\n"
     html += f"<h1>Good Samaritan Calendar Events - {days_out} Days Out</h1><br>\n"
+    
+    # We can add extra content in two ways
+    # --extra <string>
+    # --extra-file <path to text file>
     if extra != None:
         html += f'{extra}\n'
+    try:
+        if extra_file != None:
+            with open(extra_file, "r") as file:
+                file_content = file.read()
+            html+= f'{file_content}\n'
+    except FileNotFoundError:
+        # if this should abort or not is to be debated.
+        logging.error(f'{extra_file} not found')
+        return False
+    
     html += f'<h2 style="color:red">Rental Events in Red</h2>\n'
     html += f'<h2 style="color:blue">Order of Eastern Star Events in Blue</h2>\n'
 
@@ -221,8 +251,8 @@ def convert_ics_to_html(ics_file, days_out, html_file, extra):
             new_heading = True
         dtstart_str = dtstart.strftime("%Y-%m-%d %I:%M %p")
         dtend_str = dtend.strftime("%Y-%m-%d %I:%M %p")
-        #if summary.lower().find("rental") == -1 :
-        #    color = "black"
+
+        # Color some of the events so they are easier to see.
         if summary.lower().find("rental") >= 0 :
             color = "red"
         elif summary.lower().find("oes") >= 0 :
@@ -230,6 +260,7 @@ def convert_ics_to_html(ics_file, days_out, html_file, extra):
         else:
             color = "black"
         html += f'<p style="color:{color}">{dtstart_str} - {dtend_str}: {summary}</p>\n'
+
     html += "</body></html>"
 
     try:
@@ -258,7 +289,8 @@ def initialize():
     parser.add_argument('-d', '--distro', help='Distro file')
     parser.add_argument('-s', '--subject', help='Subject of email', default='Lodge Calendar')
     parser.add_argument('-v', '--verbose', help='Send all logg messages to console', default=False, action='store_true')
-    parser.add_argument('-e', '--extra', help='Extra text for mailing html')
+    parser.add_argument('-e', '--extra', help='Extra text for mailing html', default=None)
+    parser.add_argument('--extra-file', help='Extra text for mailing html from text file', default=None)
     mail_group = parser.add_mutually_exclusive_group(required=True)
     mail_group.add_argument('--mail', dest='mail', help='Send email to distro list', action='store_true')
     mail_group.add_argument('--no-mail', dest='mail', help='No email will be sent', action='store_false')
@@ -292,10 +324,11 @@ def main():
     ics_data = download_ics(isc_download)
     window = int(getattr(args, "window"))
     extra = getattr(args, 'extra')
+    extra_file = getattr(args, 'extra_file')
     html_file = "my_calendar.html"
     
     if ics_data:
-        if convert_ics_to_html(isc_download, window, html_file, extra) == False:
+        if convert_ics_to_html(isc_download, window, html_file, extra, extra_file) == False:
             return
     
     do_mail = getattr(args, 'mail')
