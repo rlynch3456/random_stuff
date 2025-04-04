@@ -187,7 +187,7 @@ def convert_ics_to_html(ics_file, days_out, html_file, extra, extra_file):
     extra: some extra html that will be added to the email, typicaly a single line
     extra_file: path to a text file that contains additional html text to be added to the email.
     '''
-    
+  
     try:
         with open(ics_file, 'r') as f:
             cal = Calendar.from_ical(f.read())
@@ -222,7 +222,17 @@ def convert_ics_to_html(ics_file, days_out, html_file, extra, extra_file):
     # Sort events by start date
     events.sort(key=lambda x: x[0])
 
-    html = "<html><head><title>Lodge Calendar</title></head><body>\n"
+    # Grab the text from html_stub file and insert into our html
+    try:
+        with open('html_stub.txt', 'r') as f:
+            stub = f.read()
+    except FileNotFoundError:
+        logging.error(f'{'html_stub.txt'} not found')
+        return False
+
+    html = f'<html><head><title>Lodge Calendar</title>\n'
+    html += f'{stub}\n</style>\n</head>\n'
+    html += f'<div class="container">\n'
     html += f"<h1>Good Samaritan Calendar Events - {days_out} Days Out</h1><br>\n"
     
     # We can add extra content in two ways
@@ -240,28 +250,40 @@ def convert_ics_to_html(ics_file, days_out, html_file, extra, extra_file):
         logging.error(f'{extra_file} not found')
         return False
     
-    html += f'<h2 style="color:red">Rental Events in Red</h2>\n'
-    html += f'<h2 style="color:blue">Order of Eastern Star Events in Blue</h2>\n'
+    html += f'<h2 class="rental">Rental Events in Red</h2>\n'
+    html += f'<h2 class="oes">Order of Eastern Star Events in Blue</h2>\n'
 
-    html += "<h2>The next 7 days</h2>\n"
+    html += f"<h2>The next 7 days</h2>\n"
+    html +=  f'<table class="event-table">\n'
+    html += f'\t<tr>\n<th>Date & Time</th>\n<th>Event</th>\n</tr>\n'
     new_heading = False
     for dtstart, dtend, summary in events:
         if dtstart >= now + datetime.timedelta(days=7) and new_heading == False:
-            html += "<br><br><h2>In the future</h2>\n"
+            # end the previous table, and start a new one
+            html += f'</table>\n'
+            html += f"<h2>In the Future</h2>\n"
+            html +=  f'<table class="event-table">\n'
+            html += f'\t<tr>\n<th>Date & Time</th>\n<th>Event</th>\n</tr>\n'
             new_heading = True
-        dtstart_str = dtstart.strftime("%Y-%m-%d %I:%M %p")
-        dtend_str = dtend.strftime("%Y-%m-%d %I:%M %p")
+        day = f'{dtstart:%B} {dtstart.day}'
+        start = dtstart.strftime("%I:%M %p")
+        end = dtend.strftime("%I:%M %p")
 
         # Color some of the events so they are easier to see.
         if summary.lower().find("rental") >= 0 :
-            color = "red"
+            modifier = 'class="rental"'
         elif summary.lower().find("oes") >= 0 :
-            color = "blue"
+            modifier = 'class="oes"'
         else:
-            color = "black"
-        html += f'<p style="color:{color}">{dtstart_str} - {dtend_str}: {summary}</p>\n'
+            modifier = ''
+        html += f'\n<tr {modifier}>\n'
+        html += f'\t<td>{day}, {start} - {end}</td>\n'
+        html += f'\t<td>{summary}</td>\n</tr>\n'
+    html += f'</table>\n'
 
-    html += "</body></html>"
+    html += f"</div>\n"
+    html += f'<p class="footer">\nWant to <a href="mailto:rlynch3456@yahoo.com?subject=Lodge Calendar Unsubscribe&body=Hello,%0D%0A%0D%0AI would like to unsubscribe from this calendar.">unsubscribe</a>?</p>\n'
+    html += f"</body></html>\n"
 
     try:
         with open(html_file, "w") as f:

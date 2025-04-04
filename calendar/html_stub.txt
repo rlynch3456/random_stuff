@@ -1,0 +1,44 @@
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        background-color: #f4f4f4;
+        padding: 20px;
+    }
+    .container {
+        max-width: 600px;
+        background-color: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        margin: auto;
+    }
+    h1, h2 {
+        text-align: center;
+    }
+    .event-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 10px;
+    }
+    .event-table th, .event-table td {
+        border: 1px solid #ddd;
+        padding: 10px;
+        text-align: left;
+    }
+    .event-table th {
+        background-color: #0073e6;
+        color: white;
+    }
+    .rental {
+        color: red;
+    }
+    .oes {
+        color: blue;
+    }
+    .footer {
+        text-align: center;
+        margin-top: 20px;
+        font-size: 12px;
+        color: #666;
+    }
+</style>
