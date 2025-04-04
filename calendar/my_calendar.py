@@ -227,7 +227,7 @@ def convert_ics_to_html(ics_file, days_out, html_file, extra, extra_file):
         with open('html_stub.txt', 'r') as f:
             stub = f.read()
     except FileNotFoundError:
-        logging.error(f'{'html_stub.txt'} not found')
+        logging.error('html_stub.txt not found')
         return False
 
     html = f'<html><head><title>Lodge Calendar</title>\n'
