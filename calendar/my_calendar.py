@@ -121,7 +121,8 @@ def send_email(distro_file, subject, html_file):
     msg = MIMEMultipart('alternative')
     msg['Subject'] = subject
     msg['From'] = EMAIL_FROM 
-    msg['To'] = ", ".join(distro)
+    msg['To'] = EMAIL_FROM
+    msg['Bcc'] = ", ".join(distro)
     html_part = MIMEText(html_content, 'html')
     msg.attach(html_part)
     debuglevel = True
