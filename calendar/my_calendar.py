@@ -134,6 +134,7 @@ def send_email(distro_file, subject, html_file):
             server.sendmail(EMAIL_FROM, distro, msg.as_string())
             server.quit()
             logging.info(f"Email sent to {msg['To']}")
+            logging.info(f"Email sent bcc to {msg['Bcc']}")
 
     except smtplib.SMTPException as e:
         logging.error(f"SMTP error occurred: {e}")
