@@ -280,7 +280,11 @@ def convert_ics_to_html(ics_file, days_out, html_file, extra, extra_file):
             modifier = ''
         html += f'\n<tr {modifier}>\n'
         html += f'\t<td>{day}, {start} - {end}</td>\n'
-        html += f'\t<td>{summary}</td>\n</tr>\n'
+        # Let's add a blood drop icon to any blood drive event
+        if summary.lower().find("blood") >= 0 :
+            html += f'\t<td>&#x1FA78 {summary}</td>\n</tr>\n'
+        else:
+            html += f'\t<td>{summary}</td>\n</tr>\n'
     html += f'</table>\n'
 
     html += f"</div>\n"
