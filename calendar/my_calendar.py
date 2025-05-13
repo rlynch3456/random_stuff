@@ -255,17 +255,17 @@ def convert_ics_to_html(ics_file, days_out, html_file, extra, extra_file):
     html += f'<h2 class="rental">Rental Events in Red</h2>\n'
     html += f'<h2 class="oes">Order of Eastern Star Events in Blue</h2>\n'
 
-    html += f"<h2>The next 7 days</h2>\n"
-    html +=  f'<table class="event-table">\n'
-    html += f'\t<tr>\n<th>Date & Time</th>\n<th>Event</th>\n</tr>\n'
+    html += f"<h2>The next week</h2>\n"
+    html +=  f'<table class="event-table" style="width:100%">\n'
+    html += f'\t<tr>\n<th style="width:50%">Date & Time</th>\n<th style="width:50%">Event</th>\n</tr>\n'
     new_heading = False
     for dtstart, dtend, summary in events:
         if dtstart >= now + datetime.timedelta(days=7) and new_heading == False:
             # end the previous table, and start a new one
             html += f'</table>\n'
             html += f"<h2>In the Future</h2>\n"
-            html +=  f'<table class="event-table">\n'
-            html += f'\t<tr>\n<th>Date & Time</th>\n<th>Event</th>\n</tr>\n'
+            html +=  f'<table class="event-table" style="width:100%">\n'
+            html += f'\t<tr>\n<th style="width:50%">Date & Time</th>\n<th style="width:50%">Event</th>\n</tr>\n'
             new_heading = True
         day = f'{dtstart:%B} {dtstart.day}'
         start = dtstart.strftime("%-I:%M %p")
