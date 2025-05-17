@@ -267,7 +267,7 @@ def convert_ics_to_html(ics_file, days_out, html_file, extra, extra_file):
             html +=  f'<table class="event-table" style="width:100%">\n'
             html += f'\t<tr>\n<th style="width:50%">Date & Time</th>\n<th style="width:50%">Event</th>\n</tr>\n'
             new_heading = True
-        day = f'{dtstart:%B} {dtstart.day}'
+        day = f'{dtstart:%A} {dtstart:%B} {dtstart.day}'
         start = dtstart.strftime("%-I:%M %p")
         end = dtend.strftime("%-I:%M %p")
 
@@ -279,7 +279,7 @@ def convert_ics_to_html(ics_file, days_out, html_file, extra, extra_file):
         else:
             modifier = ''
         html += f'\n<tr {modifier}>\n'
-        html += f'\t<td>{day}, {start} - {end}</td>\n'
+        html += f'\t<td>{day}</br> {start} - {end}</td>\n'
         # Let's add some icons
         if summary.lower().find("blood") >= 0 :
             html += f'\t<td>&#x1FA78 {summary}</td>\n</tr>\n'
