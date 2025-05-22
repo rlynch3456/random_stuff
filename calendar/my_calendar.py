@@ -17,13 +17,13 @@ def sanitize_text(text):
     """Sanitize user input or ICS text for safe HTML rendering."""
     if not text:
         return ""
-    
+
     # Escape special HTML characters
     safe_text = html.escape(text)
-    
+
     # Replace newlines with <br> for HTML emails
     safe_text = safe_text.replace("\n", "<br>")
-    
+
     return safe_text
 
 # We have two versions of the logging configuration.  The default only
@@ -70,9 +70,9 @@ verbose_config = {
 }
 
 logging.basicConfig(
-    level=logging.INFO, 
+    level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
-    filename='calendar.log', 
+    filename='calendar.log',
     filemode='a'
 )
 
@@ -88,17 +88,17 @@ def send_email(distro_file, subject, html_file):
     SMTP_SERVER = "smtp.mail.yahoo.com"
     SMTP_PORT = 587
     EMAIL_FROM = "rlynch3456@yahoo.com"
-    
+
     SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
     if SMTP_PASSWORD == None:
         logging.error("Error accessing nonexistent variable directly: SMTP_PASSWORD")
         return False
-    
+
     SMTP_USERNAME = os.getenv("SMTP_USERNAME")
     if SMTP_PASSWORD == None:
         logging.error("Error accessing nonexistent variable directly: SMTP_USERNAME")
         return False
-    
+
     distro = []
     # get the distro list
     try:
@@ -117,10 +117,10 @@ def send_email(distro_file, subject, html_file):
     except FileNotFoundError:
         logging.error(f'{html_file} not found')
         return False
-    
+
     msg = MIMEMultipart('alternative')
     msg['Subject'] = subject
-    msg['From'] = EMAIL_FROM 
+    msg['From'] = EMAIL_FROM
     msg['To'] = EMAIL_FROM
     msg['Bcc'] = ", ".join(distro)
     html_part = MIMEText(html_content, 'html')
@@ -144,7 +144,7 @@ def send_email(distro_file, subject, html_file):
 def download_ics(isc_download):
     '''
     Download ICS file from Synology Calendar.'
-    
+
     Parameters:
     isc_download: Filename for the download.
 
@@ -156,7 +156,7 @@ def download_ics(isc_download):
     if ICS_URL == None:
         logging.error("Error accessing nonexistent variable directly: ICS_URL")
         return False
-    
+
     CALENDAR_PASSWORD = os.getenv("CALENDAR_PASSWORD")
     if CALENDAR_PASSWORD == None:
         logging.error("Error accessing nonexistent variable directly: CALENDAR_PASSWORD")
@@ -170,37 +170,35 @@ def download_ics(isc_download):
     command_string = f"curl -u {CALENDAR_USERNAME}:{CALENDAR_PASSWORD} {ICS_URL} -o {isc_download} -k"
 
     subprocess.call(command_string, shell=True)
- 
+
     if os.path.exists(isc_download):
         logging.info('ics downloaded')
         return True
     else:
         logging.error('ics not downloaded')
         return False
-
-def convert_ics_to_html(ics_file, days_out, html_file, extra, extra_file):
+def convert_ics_to_conflict_grouping(ics_file, days_out, html_file, extra, extra_file):
     '''
-    Convert ICS file content to an HTML file with events sorted by date.
-    
+    Convert ICS file content to an HTML file with back to back events
+    and possible conflicts.
+
     Parameters:
     ics_file: Path to ics calendar file
-    days_out: Integer number of days that HTML file will show
     html_file: Output path to html file created
     extra: some extra html that will be added to the email, typicaly a single line
     extra_file: path to a text file that contains additional html text to be added to the email.
     '''
-  
     try:
         with open(ics_file, 'r') as f:
             cal = Calendar.from_ical(f.read())
     except FileNotFoundError:
         logging.error(f'{ics_file} not found')
         return False
-    
+
     events = []
     my_tz = pytz.timezone('America/New_York')
     now = my_tz.localize(datetime.datetime.now())
-    
+
     for event in cal.walk("vevent"):
         summary = sanitize_text(event.get("summary", "No Title"))
 
@@ -216,7 +214,173 @@ def convert_ics_to_html(ics_file, days_out, html_file, extra, extra_file):
         if dtstart.tzinfo is None:
             dtstart = dtstart.replace(tzinfo=tz.UTC)
         if dtend.tzinfo is None:
-            dtend = dtend.replace(tzinfo=tz.UTC)    
+            dtend = dtend.replace(tzinfo=tz.UTC)
+
+        if dtstart >= now and dtstart <= now + datetime.timedelta(days=days_out):
+            events.append((dtstart, dtend, summary))
+
+    # Sort events by start date
+    events.sort(key=lambda x: x[0])
+
+    # Build pairs of contiguous events
+    b2b_groups = []
+    concurrent_groups = []
+
+    for i in range(len(events) - 1):
+        first = events[i]
+        second = events[i + 1]
+        if second[0].date() == first[0].date() + datetime.timedelta(days=1):
+            b2b_groups.append([first, second])
+        if second[0].date() == first[0].date():
+            concurrent_groups.append([first, second])
+
+    # Now let's create the html file
+    # Grab the text from html_stub file and insert into our html
+    try:
+        with open('html_stub.txt', 'r') as f:
+            stub = f.read()
+    except FileNotFoundError:
+        logging.error('html_stub.txt not found')
+        return False
+
+    html = f'<html><head><title>Lodge Calendar</title>\n'
+    html += f'{stub}\n</style>\n</head>\n'
+    html += f'<div class="container">\n'
+    html += f"<h1>Good Samaritan Calendar</h1><br>\n"
+
+    # We can add extra content in two ways
+    # --extra <string>
+    # --extra-file <path to text file>
+    if extra != None:
+        html += f'{extra}\n'
+    try:
+        if extra_file != None:
+            with open(extra_file, "r") as file:
+                file_content = file.read()
+            html+= f'{file_content}\n'
+    except FileNotFoundError:
+        # if this should abort or not is to be debated.
+        logging.error(f'{extra_file} not found')
+        return False
+
+    html += f'<h2>Back to Back Events</h2><br>\n'
+    html +=  f'<table class="event-table" style="width:100%">\n'
+    html += f'\t<tr>\n<th style="width:50%">Date & Time</th>\n<th style="width:50%">Event</th>\n</tr>\n'
+
+    for group in b2b_groups:
+        for dtstart, dtend, summary in group:
+
+            day = f'{dtstart:%A} {dtstart:%B} {dtstart.day}'
+            start = dtstart.strftime("%-I:%M %p")
+            end = dtend.strftime("%-I:%M %p")
+
+            # Color some of the events so they are easier to see.
+            if summary.lower().find("rental") >= 0 :
+                modifier = 'class="rental"'
+            elif summary.lower().find("oes") >= 0 :
+                modifier = 'class="oes"'
+            else:
+                modifier = ''
+            html += f'\n<tr {modifier}>\n'
+            html += f'\t<td>{day}</br> {start} - {end}</td>\n'
+            # Let's add some icons
+            if summary.lower().find("blood") >= 0 :
+                html += f'\t<td>&#x1FA78 {summary}</td>\n</tr>\n'
+            elif summary.lower().find("game") >= 0 :
+                html += f'\t<td>&#127922 {summary}</td>\n</tr>\n'
+            else:
+                html += f'\t<td>{summary}</td>\n</tr>\n'
+
+        html += f'\t<tr height="50px"></tr>\n'
+
+    html += f'</table>\n'
+
+    html += f'<h2>Possible Conflicts</h2><br>\n'
+    html +=  f'<table class="event-table" style="width:100%">\n'
+    html += f'\t<tr>\n<th style="width:50%">Date & Time</th>\n<th style="width:50%">Event</th>\n</tr>\n'
+
+    for group in concurrent_groups:
+        for dtstart, dtend, summary in group:
+
+            day = f'{dtstart:%A} {dtstart:%B} {dtstart.day}'
+            start = dtstart.strftime("%-I:%M %p")
+            end = dtend.strftime("%-I:%M %p")
+
+            # Color some of the events so they are easier to see.
+            if summary.lower().find("rental") >= 0 :
+                modifier = 'class="rental"'
+            elif summary.lower().find("oes") >= 0 :
+                modifier = 'class="oes"'
+            else:
+                modifier = ''
+            html += f'\n<tr {modifier}>\n'
+            html += f'\t<td>{day}</br> {start} - {end}</td>\n'
+            # Let's add some icons
+            if summary.lower().find("blood") >= 0 :
+                html += f'\t<td>&#x1FA78 {summary}</td>\n</tr>\n'
+            elif summary.lower().find("game") >= 0 :
+                html += f'\t<td>&#127922 {summary}</td>\n</tr>\n'
+            elif summary.lower().find('donut') >= 0:
+                html += f'\t<td>&#x1F369 {summary}</td>\n</tr>\n'
+            else:
+                html += f'\t<td>{summary}</td>\n</tr>\n'
+
+        html += f'\t<tr height="50px"></tr>\n'
+
+    html += f'</table>\n'
+
+    html += f"</div>\n"
+    html += f'<p class="footer">\nWant to <a href="mailto:rlynch3456@yahoo.com?subject=Lodge Calendar Unsubscribe&body=Hello,%0D%0A%0D%0AI would like to unsubscribe from this calendar.">unsubscribe</a>?</p>\n'
+    html += f"</body></html>\n"
+
+    try:
+        with open(html_file, "w") as f:
+            f.write(html)
+    except FileNotFoundError:
+        logging.error(f'{html_file} could not be written.')
+        return False
+
+    return
+
+def convert_ics_to_html(ics_file, days_out, html_file, extra, extra_file):
+    '''
+    Convert ICS file content to an HTML file with events sorted by date.
+
+    Parameters:
+    ics_file: Path to ics calendar file
+    days_out: Integer number of days that HTML file will show
+    html_file: Output path to html file created
+    extra: some extra html that will be added to the email, typicaly a single line
+    extra_file: path to a text file that contains additional html text to be added to the email.
+    '''
+
+    try:
+        with open(ics_file, 'r') as f:
+            cal = Calendar.from_ical(f.read())
+    except FileNotFoundError:
+        logging.error(f'{ics_file} not found')
+        return False
+
+    events = []
+    my_tz = pytz.timezone('America/New_York')
+    now = my_tz.localize(datetime.datetime.now())
+
+    for event in cal.walk("vevent"):
+        summary = sanitize_text(event.get("summary", "No Title"))
+
+        dtstart = event.get("dtstart").dt
+        dtend = event.get("dtend").dt
+
+        if isinstance(dtstart, datetime.date) and not isinstance(dtstart, datetime.datetime):
+            dtstart = datetime.datetime.combine(dtstart, datetime.time.min)
+        if isinstance(dtend, datetime.date) and not isinstance(dtend, datetime.datetime):
+            dtend = datetime.datetime.combine(dtend, datetime.time.min)
+
+        # Ensure all datetimes are timezone-aware (convert naive to UTC)
+        if dtstart.tzinfo is None:
+            dtstart = dtstart.replace(tzinfo=tz.UTC)
+        if dtend.tzinfo is None:
+            dtend = dtend.replace(tzinfo=tz.UTC)
 
         if dtstart >= now and dtstart <= now + datetime.timedelta(days=days_out):
             events.append((dtstart, dtend, summary))
@@ -236,7 +400,7 @@ def convert_ics_to_html(ics_file, days_out, html_file, extra, extra_file):
     html += f'{stub}\n</style>\n</head>\n'
     html += f'<div class="container">\n'
     html += f"<h1>Good Samaritan Calendar Events - {days_out} Days Out</h1><br>\n"
-    
+
     # We can add extra content in two ways
     # --extra <string>
     # --extra-file <path to text file>
@@ -251,7 +415,7 @@ def convert_ics_to_html(ics_file, days_out, html_file, extra, extra_file):
         # if this should abort or not is to be debated.
         logging.error(f'{extra_file} not found')
         return False
-    
+
     html += f'<h2 class="rental">Rental Events in Red</h2>\n'
     html += f'<h2 class="oes">Order of Eastern Star Events in Blue</h2>\n'
 
@@ -285,6 +449,8 @@ def convert_ics_to_html(ics_file, days_out, html_file, extra, extra_file):
             html += f'\t<td>&#x1FA78 {summary}</td>\n</tr>\n'
         elif summary.lower().find("game") >= 0 :
             html += f'\t<td>&#127922 {summary}</td>\n</tr>\n'
+        elif summary.lower().find('donut') >= 0:
+            html += f'\t<td>&#x1F369 {summary}</td>\n</tr>\n'
         else:
             html += f'\t<td>{summary}</td>\n</tr>\n'
 
@@ -300,14 +466,14 @@ def convert_ics_to_html(ics_file, days_out, html_file, extra, extra_file):
     except FileNotFoundError:
         logging.error(f'{html_file} could not be written.')
         return False
-    
+
     return True
 
 def initialize():
 
     '''
     Load envirnoment variables from .env file.
-    
+
     Returns: args
     '''
     # This will hide usernames and passwords.
@@ -321,10 +487,13 @@ def initialize():
     parser.add_argument('-s', '--subject', help='Subject of email', default='Lodge Calendar')
     parser.add_argument('-v', '--verbose', help='Send all logg messages to console', default=False, action='store_true')
     parser.add_argument('-e', '--extra', help='Extra text for mailing html', default=None)
+    #parser.add_argument('-c', '--conflicts', help='Send email with conflicts')
+    #parser.add_argument('-m', '--mail', help='Send calendar email')
+    #parser.add_argument('-t', '--test', help='Create html only, no mail sent', action='store_true')
     parser.add_argument('--extra-file', help='Extra text for mailing html from text file', default=None)
     mail_group = parser.add_mutually_exclusive_group(required=True)
-    mail_group.add_argument('--mail', dest='mail', help='Send email to distro list', action='store_true')
-    mail_group.add_argument('--no-mail', dest='mail', help='No email will be sent', action='store_false')
+    mail_group.add_argument('-m', '--mail', help='Send email to distro list', action='store_true')
+    mail_group.add_argument('-c', '--conflicts', help='No email will be sent', action='store_true')
     args = parser.parse_args()
 
     verbose = getattr(args, 'verbose')
@@ -341,33 +510,32 @@ def initialize():
 
     return args
 def main():
-    
+
     args = initialize()
 
-    do_mail = getattr(args, 'mail')
-    distro = getattr(args, 'distro')
-
-    if do_mail == True and distro == None:
-        logging.error('Mail was requested, but no distro list provided.')
-        return
+    if hasattr(args, 'distro'):
+        mail_distro = getattr(args, 'distro')
 
     isc_download = "download.ics"
     ics_data = download_ics(isc_download)
     window = int(getattr(args, "window"))
     extra = getattr(args, 'extra')
     extra_file = getattr(args, 'extra_file')
-    html_file = "my_calendar.html"
-    
-    if ics_data:
-        if convert_ics_to_html(isc_download, window, html_file, extra, extra_file) == False:
-            return
-    
-    do_mail = getattr(args, 'mail')
+    html_file = "my_html.html"
 
-    if do_mail:
-        distro = getattr(args, "distro")
+    if ics_data:
+        if getattr(args, 'mail'):
+            if convert_ics_to_html(isc_download, window, html_file, extra, extra_file) == False:
+                return
+
+        if getattr(args, 'conflicts'):
+            if convert_ics_to_conflict_grouping(isc_download, window, html_file, extra, extra_file) == False:
+                return
+
+    if mail_distro:
         subject = getattr(args, "subject")
-        send_email(distro, subject, html_file)
+        send_email(mail_distro, subject, html_file)
+
 
 if __name__ == "__main__":
     main()
