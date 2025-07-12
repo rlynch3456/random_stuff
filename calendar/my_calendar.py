@@ -330,7 +330,8 @@ def convert_ics_to_conflict_grouping(ics_file, days_out, html_file, extra, extra
     html += f'</table>\n'
 
     html += f"</div>\n"
-    html += f'<p class="footer">\nWant to <a href="mailto:rlynch3456@yahoo.com?subject=Lodge Calendar Unsubscribe&body=Hello,%0D%0A%0D%0AI would like to unsubscribe from this calendar.">unsubscribe</a>?</p>\n'
+    html += f'<p class="footer">\nWant to <a href="mailto:rlynch3456@yahoo.com?subject=Lodge Calendar Unsubscribe&body=Hello,%0D%0A%0D%0AI would like to unsubscribe from this calendar.">unsubscribe</a>?</br>\n'
+    html += f'See full <a href="https://Rlynch3456.quickconnect.to/sharing/mIsvOeoew">calendar</a></p>\n'
     html += f"</body></html>\n"
 
     try:
@@ -342,7 +343,7 @@ def convert_ics_to_conflict_grouping(ics_file, days_out, html_file, extra, extra
 
     return
 
-def convert_ics_to_html(ics_file, days_out, html_file, extra, extra_file):
+def convert_ics_to_html(ics_file, days_out, html_file, extra, extra_file, filter):
     '''
     Convert ICS file content to an HTML file with events sorted by date.
 
@@ -367,6 +368,9 @@ def convert_ics_to_html(ics_file, days_out, html_file, extra, extra_file):
 
     for event in cal.walk("vevent"):
         summary = sanitize_text(event.get("summary", "No Title"))
+
+        if not filter == None and summary.lower().find(filter.lower()) == -1:
+            continue
 
         dtstart = event.get("dtstart").dt
         dtend = event.get("dtend").dt
@@ -416,6 +420,9 @@ def convert_ics_to_html(ics_file, days_out, html_file, extra, extra_file):
         logging.error(f'{extra_file} not found')
         return False
 
+    if not filter == None:
+        html += f'<h2>Filter: {filter}</h2>\n'
+
     html += f'<h2 class="rental">Rental Events in Red</h2>\n'
     html += f'<h2 class="oes">Order of Eastern Star Events in Blue</h2>\n'
 
@@ -457,7 +464,8 @@ def convert_ics_to_html(ics_file, days_out, html_file, extra, extra_file):
     html += f'</table>\n'
 
     html += f"</div>\n"
-    html += f'<p class="footer">\nWant to <a href="mailto:rlynch3456@yahoo.com?subject=Lodge Calendar Unsubscribe&body=Hello,%0D%0A%0D%0AI would like to unsubscribe from this calendar.">unsubscribe</a>?</p>\n'
+    html += f'<p class="footer">\nWant to <a href="mailto:rlynch3456@yahoo.com?subject=Lodge Calendar Unsubscribe&body=Hello,%0D%0A%0D%0AI would like to unsubscribe from this calendar.">unsubscribe</a>?</br>\n'
+    html += f'See full <a href="https://Rlynch3456.quickconnect.to/sharing/mIsvOeoew">calendar</a></p>\n'
     html += f"</body></html>\n"
 
     try:
@@ -487,6 +495,7 @@ def initialize():
     parser.add_argument('-s', '--subject', help='Subject of email', default='Lodge Calendar')
     parser.add_argument('-v', '--verbose', help='Send all logg messages to console', default=False, action='store_true')
     parser.add_argument('-e', '--extra', help='Extra text for mailing html', default=None)
+    parser.add_argument('-f', '--filter', help='Text filer')
     #parser.add_argument('-c', '--conflicts', help='Send email with conflicts')
     #parser.add_argument('-m', '--mail', help='Send calendar email')
     #parser.add_argument('-t', '--test', help='Create html only, no mail sent', action='store_true')
@@ -521,11 +530,12 @@ def main():
     window = int(getattr(args, "window"))
     extra = getattr(args, 'extra')
     extra_file = getattr(args, 'extra_file')
+    filter = getattr(args, 'filter')
     html_file = "my_html.html"
 
     if ics_data:
         if getattr(args, 'mail'):
-            if convert_ics_to_html(isc_download, window, html_file, extra, extra_file) == False:
+            if convert_ics_to_html(isc_download, window, html_file, extra, extra_file, filter) == False:
                 return
 
         if getattr(args, 'conflicts'):
