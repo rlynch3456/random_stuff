@@ -141,12 +141,12 @@ def send_email(distro_file, subject, html_file):
 
     return True
 
-def download_ics(isc_download):
+def download_ics(ics_download):
     '''
     Download ICS file from Synology Calendar.'
 
     Parameters:
-    isc_download: Filename for the download.
+    ics_download: Filename for the download.
 
     Return:
     True if file was downloaded, otherwise False.
@@ -167,16 +167,17 @@ def download_ics(isc_download):
         logging.error("Error accessing nonexistent variable directly: CALENDAR_USERNAME")
         return False
 
-    command_string = f"curl -u {CALENDAR_USERNAME}:{CALENDAR_PASSWORD} {ICS_URL} -o {isc_download} -k"
+    command_string = f"curl -u {CALENDAR_USERNAME}:{CALENDAR_PASSWORD} {ICS_URL} -o {ics_download} -k"
 
     subprocess.call(command_string, shell=True)
 
-    if os.path.exists(isc_download):
+    if os.path.exists(ics_download):
         logging.info('ics downloaded')
         return True
     else:
         logging.error('ics not downloaded')
         return False
+
 def convert_ics_to_conflict_grouping(ics_file, days_out, html_file, extra, extra_file):
     '''
     Convert ICS file content to an HTML file with back to back events
@@ -188,39 +189,13 @@ def convert_ics_to_conflict_grouping(ics_file, days_out, html_file, extra, extra
     extra: some extra html that will be added to the email, typicaly a single line
     extra_file: path to a text file that contains additional html text to be added to the email.
     '''
-    try:
-        with open(ics_file, 'r') as f:
-            cal = Calendar.from_ical(f.read())
-    except FileNotFoundError:
-        logging.error(f'{ics_file} not found')
-        return False
 
-    events = []
-    my_tz = pytz.timezone('America/New_York')
-    now = my_tz.localize(datetime.datetime.now())
+    events = get_events(ics_file, days_out)
 
-    for event in cal.walk("vevent"):
-        summary = sanitize_text(event.get("summary", "No Title"))
+    # Get the calendar from 7 days ago.  This is assuming that this is being run from a script once a week
 
-        dtstart = event.get("dtstart").dt
-        dtend = event.get("dtend").dt
-
-        if isinstance(dtstart, datetime.date) and not isinstance(dtstart, datetime.datetime):
-            dtstart = datetime.datetime.combine(dtstart, datetime.time.min)
-        if isinstance(dtend, datetime.date) and not isinstance(dtend, datetime.datetime):
-            dtend = datetime.datetime.combine(dtend, datetime.time.min)
-
-        # Ensure all datetimes are timezone-aware (convert naive to UTC)
-        if dtstart.tzinfo is None:
-            dtstart = dtstart.replace(tzinfo=tz.UTC)
-        if dtend.tzinfo is None:
-            dtend = dtend.replace(tzinfo=tz.UTC)
-
-        if dtstart >= now and dtstart <= now + datetime.timedelta(days=days_out):
-            events.append((dtstart, dtend, summary))
-
-    # Sort events by start date
-    events.sort(key=lambda x: x[0])
+    previous_cal_name = f'{(datetime.datetime.now() - datetime.timedelta(days=7)).strftime('%Y-%m-%d')}.ics'
+    previous_events = get_events(previous_cal_name, days_out)
 
     # Build pairs of contiguous events
     b2b_groups = []
@@ -247,6 +222,9 @@ def convert_ics_to_conflict_grouping(ics_file, days_out, html_file, extra, extra
     html += f'{stub}\n</style>\n</head>\n'
     html += f'<div class="container">\n'
     html += f"<h1>Good Samaritan Calendar</h1><br>\n"
+    if previous_events:
+        str_date = (datetime.datetime.now() - datetime.timedelta(days=7)).strftime("%B %d, %Y")
+        html += f'<h2>Rows in gray are new/modified since </br> {str_date}</h2>'
 
     # We can add extra content in two ways
     # --extra <string>
@@ -282,14 +260,19 @@ def convert_ics_to_conflict_grouping(ics_file, days_out, html_file, extra, extra
             else:
                 modifier = ''
             html += f'\n<tr {modifier}>\n'
-            html += f'\t<td>{day}</br> {start} - {end}</td>\n'
+            # Highlight any event that is new or modified
+            if previous_events and not (dtstart, dtend, summary) in previous_events:
+                background = 'style="background-color: lightgray;\"'
+            else:
+                background = ''
+            html += f'\t<td {background}>{day}</br> {start} - {end}</td>\n'
             # Let's add some icons
             if summary.lower().find("blood") >= 0 :
-                html += f'\t<td>&#x1FA78 {summary}</td>\n</tr>\n'
+                html += f'\t<td {background}>&#x1FA78 {summary}</td>\n</tr>\n'
             elif summary.lower().find("game") >= 0 :
-                html += f'\t<td>&#127922 {summary}</td>\n</tr>\n'
+                html += f'\t<td {background}>&#127922 {summary}</td>\n</tr>\n'
             else:
-                html += f'\t<td>{summary}</td>\n</tr>\n'
+                html += f'\t<td {background}>{summary}</td>\n</tr>\n'
 
         html += f'\t<tr height="50px"></tr>\n'
 
@@ -314,16 +297,22 @@ def convert_ics_to_conflict_grouping(ics_file, days_out, html_file, extra, extra
             else:
                 modifier = ''
             html += f'\n<tr {modifier}>\n'
-            html += f'\t<td>{day}</br> {start} - {end}</td>\n'
+            # Highlight any event that is new or modified
+            if previous_events and not (dtstart, dtend, summary) in previous_events:
+                background = 'style="background-color: lightgray;\"'
+            else:
+                background = ''
+            
+            html += f'\t<td {background}>{day}</br> {start} - {end}</td>\n'
             # Let's add some icons
             if summary.lower().find("blood") >= 0 :
-                html += f'\t<td>&#x1FA78 {summary}</td>\n</tr>\n'
+                html += f'\t<td {background}>&#x1FA78 {summary}</td>\n</tr>\n'
             elif summary.lower().find("game") >= 0 :
-                html += f'\t<td>&#127922 {summary}</td>\n</tr>\n'
+                html += f'\t<td {background}>&#127922 {summary}</td>\n</tr>\n'
             elif summary.lower().find('donut') >= 0:
-                html += f'\t<td>&#x1F369 {summary}</td>\n</tr>\n'
+                html += f'\t<td {background}>&#x1F369 {summary}</td>\n</tr>\n'
             else:
-                html += f'\t<td>{summary}</td>\n</tr>\n'
+                html += f'\t<td {background}>{summary}</td>\n</tr>\n'
 
         html += f'\t<tr height="50px"></tr>\n'
 
@@ -343,17 +332,7 @@ def convert_ics_to_conflict_grouping(ics_file, days_out, html_file, extra, extra
 
     return
 
-def convert_ics_to_html(ics_file, days_out, html_file, extra, extra_file, filter):
-    '''
-    Convert ICS file content to an HTML file with events sorted by date.
-
-    Parameters:
-    ics_file: Path to ics calendar file
-    days_out: Integer number of days that HTML file will show
-    html_file: Output path to html file created
-    extra: some extra html that will be added to the email, typicaly a single line
-    extra_file: path to a text file that contains additional html text to be added to the email.
-    '''
+def get_events(ics_file, days_out, filter=None):
 
     try:
         with open(ics_file, 'r') as f:
@@ -361,7 +340,7 @@ def convert_ics_to_html(ics_file, days_out, html_file, extra, extra_file, filter
     except FileNotFoundError:
         logging.error(f'{ics_file} not found')
         return False
-
+    
     events = []
     my_tz = pytz.timezone('America/New_York')
     now = my_tz.localize(datetime.datetime.now())
@@ -369,8 +348,9 @@ def convert_ics_to_html(ics_file, days_out, html_file, extra, extra_file, filter
     for event in cal.walk("vevent"):
         summary = sanitize_text(event.get("summary", "No Title"))
 
-        if not filter == None and summary.lower().find(filter.lower()) == -1:
-            continue
+        if not filter == None:
+            if summary.lower().find(filter.lower()) == -1:
+                continue
 
         dtstart = event.get("dtstart").dt
         dtend = event.get("dtend").dt
@@ -391,6 +371,26 @@ def convert_ics_to_html(ics_file, days_out, html_file, extra, extra_file, filter
 
     # Sort events by start date
     events.sort(key=lambda x: x[0])
+    return events
+
+def convert_ics_to_html(ics_file, days_out, html_file, extra, extra_file, filter):
+    '''
+    Convert ICS file content to an HTML file with events sorted by date.
+
+    Parameters:
+    ics_file: Path to ics calendar file
+    days_out: Integer number of days that HTML file will show
+    html_file: Output path to html file created
+    extra: some extra html that will be added to the email, typicaly a single line
+    extra_file: path to a text file that contains additional html text to be added to the email.
+    '''
+
+    events = get_events(ics_file, days_out, filter)
+
+    # Get the calendar from 7 days ago.  This is assuming that this is being run from a script once a week
+
+    previous_cal_name = f'{(datetime.datetime.now() - datetime.timedelta(days=7)).strftime('%Y-%m-%d')}.ics'
+    previous_events = get_events(previous_cal_name, days_out, filter)
 
     # Grab the text from html_stub file and insert into our html
     try:
@@ -425,11 +425,16 @@ def convert_ics_to_html(ics_file, days_out, html_file, extra, extra_file, filter
 
     html += f'<h2 class="rental">Rental Events in Red</h2>\n'
     html += f'<h2 class="oes">Order of Eastern Star Events in Blue</h2>\n'
+    if previous_events:
+        str_date = (datetime.datetime.now() - datetime.timedelta(days=7)).strftime("%B %d, %Y")
+        html += f'<h2>Rows in gray are new/modified since </br> {str_date}</h2>'
 
     html += f"<h2>The next week</h2>\n"
     html +=  f'<table class="event-table" style="width:100%">\n'
     html += f'\t<tr>\n<th style="width:50%">Date & Time</th>\n<th style="width:50%">Event</th>\n</tr>\n'
     new_heading = False
+    my_tz = pytz.timezone('America/New_York')
+    now = my_tz.localize(datetime.datetime.now())
     for dtstart, dtend, summary in events:
         if dtstart >= now + datetime.timedelta(days=7) and new_heading == False:
             # end the previous table, and start a new one
@@ -449,17 +454,26 @@ def convert_ics_to_html(ics_file, days_out, html_file, extra, extra_file, filter
             modifier = 'class="oes"'
         else:
             modifier = ''
+
         html += f'\n<tr {modifier}>\n'
-        html += f'\t<td>{day}</br> {start} - {end}</td>\n'
+
+        # Highlight any event that is new or modified
+        if previous_events and not (dtstart, dtend, summary) in previous_events:
+            background = 'style="background-color: lightgray;\"'
+        else:
+            background = ''
+
+        html += f'\t<td {background}>{day}</br> {start} - {end}</td>\n'
+
         # Let's add some icons
         if summary.lower().find("blood") >= 0 :
-            html += f'\t<td>&#x1FA78 {summary}</td>\n</tr>\n'
+            html += f'\t<td {background}>&#x1FA78 {summary}</td>\n</tr>\n'
         elif summary.lower().find("game") >= 0 :
-            html += f'\t<td>&#127922 {summary}</td>\n</tr>\n'
+            html += f'\t<td {background}>&#127922 {summary}</td>\n</tr>\n'
         elif summary.lower().find('donut') >= 0:
-            html += f'\t<td>&#x1F369 {summary}</td>\n</tr>\n'
+            html += f'\t<td {background}>&#x1F369 {summary}</td>\n</tr>\n'
         else:
-            html += f'\t<td>{summary}</td>\n</tr>\n'
+            html += f'\t<td {background}>{summary}</td>\n</tr>\n'
 
     html += f'</table>\n'
 
@@ -493,12 +507,10 @@ def initialize():
     parser.add_argument('-w', '--window', help='time window', default="60")
     parser.add_argument('-d', '--distro', help='Distro file')
     parser.add_argument('-s', '--subject', help='Subject of email', default='Lodge Calendar')
-    parser.add_argument('-v', '--verbose', help='Send all logg messages to console', default=False, action='store_true')
+    parser.add_argument('-v', '--verbose', help='Send all log messages to console', default=False, action='store_true')
     parser.add_argument('-e', '--extra', help='Extra text for mailing html', default=None)
     parser.add_argument('-f', '--filter', help='Text filer')
-    #parser.add_argument('-c', '--conflicts', help='Send email with conflicts')
-    #parser.add_argument('-m', '--mail', help='Send calendar email')
-    #parser.add_argument('-t', '--test', help='Create html only, no mail sent', action='store_true')
+    parser.add_argument('-u', '--update', help='Look for calendar updates')
     parser.add_argument('--extra-file', help='Extra text for mailing html from text file', default=None)
     mail_group = parser.add_mutually_exclusive_group(required=True)
     mail_group.add_argument('-m', '--mail', help='Send email to distro list', action='store_true')
@@ -525,8 +537,12 @@ def main():
     if hasattr(args, 'distro'):
         mail_distro = getattr(args, 'distro')
 
-    isc_download = "download.ics"
-    ics_data = download_ics(isc_download)
+        # make a date string for calendar download with today's date
+    today = datetime.datetime.now()
+    today_string = f'{today.strftime('%Y-%m-%d')}.ics'
+    ics_download = today_string
+    ics_data = download_ics(today_string)
+
     window = int(getattr(args, "window"))
     extra = getattr(args, 'extra')
     extra_file = getattr(args, 'extra_file')
@@ -535,11 +551,11 @@ def main():
 
     if ics_data:
         if getattr(args, 'mail'):
-            if convert_ics_to_html(isc_download, window, html_file, extra, extra_file, filter) == False:
+            if convert_ics_to_html(ics_download, window, html_file, extra, extra_file, filter) == False:
                 return
 
         if getattr(args, 'conflicts'):
-            if convert_ics_to_conflict_grouping(isc_download, window, html_file, extra, extra_file) == False:
+            if convert_ics_to_conflict_grouping(ics_download, window, html_file, extra, extra_file) == False:
                 return
 
     if mail_distro:
