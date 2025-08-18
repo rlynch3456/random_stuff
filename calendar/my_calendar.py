@@ -194,7 +194,7 @@ def convert_ics_to_conflict_grouping(ics_file, days_out, html_file, extra, extra
 
     # Get the calendar from 7 days ago.  This is assuming that this is being run from a script once a week
 
-    previous_cal_name = f'{(datetime.datetime.now() - datetime.timedelta(days=7)).strftime('%Y-%m-%d')}.ics'
+    previous_cal_name = f'{(datetime.datetime.now() - datetime.timedelta(days=7)).strftime("%Y-%m-%d")}.ics'
     previous_events = get_events(previous_cal_name, days_out)
 
     # Build pairs of contiguous events
@@ -389,7 +389,7 @@ def convert_ics_to_html(ics_file, days_out, html_file, extra, extra_file, filter
 
     # Get the calendar from 7 days ago.  This is assuming that this is being run from a script once a week
 
-    previous_cal_name = f'{(datetime.datetime.now() - datetime.timedelta(days=7)).strftime('%Y-%m-%d')}.ics'
+    previous_cal_name = f'{(datetime.datetime.now() - datetime.timedelta(days=7)).strftime("%Y-%m-%d")}.ics'
     previous_events = get_events(previous_cal_name, days_out, filter)
 
     # Grab the text from html_stub file and insert into our html
@@ -539,7 +539,7 @@ def main():
 
         # make a date string for calendar download with today's date
     today = datetime.datetime.now()
-    today_string = f'{today.strftime('%Y-%m-%d')}.ics'
+    today_string = f'{today.strftime("%Y-%m-%d")}.ics'
     ics_download = today_string
     ics_data = download_ics(today_string)
 
