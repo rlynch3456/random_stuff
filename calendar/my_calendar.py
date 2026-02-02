@@ -332,7 +332,7 @@ def convert_ics_to_conflict_grouping(ics_file, days_out, html_file, extra, extra
 
     return
 
-def get_events(ics_file, days_out, filter=None):
+def get_events(ics_file, days_out, filter=None, year=None, month=None):
 
     try:
         with open(ics_file, 'r') as f:
@@ -343,7 +343,10 @@ def get_events(ics_file, days_out, filter=None):
     
     events = []
     my_tz = pytz.timezone('America/New_York')
-    now = my_tz.localize(datetime.datetime.now())
+    if year == None and month == None:
+        now = my_tz.localize(datetime.datetime.now())
+    else:
+        now = my_tz.localize(datetime.datetime(year, month, 1))
 
     for event in cal.walk("vevent"):
         summary = sanitize_text(event.get("summary", "No Title"))
