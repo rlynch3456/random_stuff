@@ -1,0 +1,56 @@
+<!doctype html>
+<html>
+<head>
+  <title>Good Samaritan Lodge Calendar</title>
+  <style>
+    table {
+      border-collapse: collapse;
+      margin-top: 1em;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 6px;
+      text-align: center;
+      width: 36px;
+    }
+    .highlight {
+      background-color: #90caf9;
+      font-weight: bold;
+    }
+    .noday {
+      background-color: #f5f5f5;
+    }
+    form {
+      margin-bottom: 1em;
+    }
+  </style>
+</head>
+<body>
+  <h1>Good Samaritan Lodge Calendar</h1>
+  <h2>Select Month and Year</h2>
+
+  <form method="post">
+    <select name="month">
+      {% for m_num, m_name in months %}
+        <option value="{{ m_num }}" {% if m_num == month %}selected{% endif %}>
+          {{ m_name }}
+        </option>
+      {% endfor %}
+    </select>
+
+    <select name="year">
+      {% for y in years %}
+        <option value="{{ y }}" {% if y == year %}selected{% endif %}>
+          {{ y }}
+        </option>
+      {% endfor %}
+    </select>
+
+    <button type="submit">Show</button>
+  </form>
+
+
+  {{ calendar_html | safe }}
+
+</body>
+</html>
